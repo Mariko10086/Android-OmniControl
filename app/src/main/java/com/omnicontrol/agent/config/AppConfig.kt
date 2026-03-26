@@ -19,9 +19,9 @@ object AppConfig {
     private const val KEY_MQTT_BROKER_HOST        = "mqtt_broker_host"
     private const val KEY_MQTT_BROKER_PORT        = "mqtt_broker_port"
 
-    val DEFAULT_SERVER_URL: String       = BuildConfig.SERVER_BASE_URL
-    val DEFAULT_MQTT_BROKER_HOST: String = BuildConfig.MQTT_BROKER_HOST
-    val DEFAULT_MQTT_BROKER_PORT: Int    = BuildConfig.MQTT_BROKER_PORT
+    val DEFAULT_SERVER_URL: String       get() = BuildConfig.SERVER_BASE_URL
+    val DEFAULT_MQTT_BROKER_HOST: String get() = BuildConfig.MQTT_BROKER_HOST
+    val DEFAULT_MQTT_BROKER_PORT: Int    get() = BuildConfig.MQTT_BROKER_PORT.toInt()
     const val DEFAULT_REPORT_INTERVAL_MINUTES     = 15L
     const val HTTP_TIMEOUT_SECONDS                = 30L
 

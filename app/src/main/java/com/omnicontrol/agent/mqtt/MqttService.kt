@@ -160,7 +160,7 @@ class MqttService : Service() {
         return NotificationCompat.Builder(this, NOTIF_CHANNEL_ID)
             .setContentTitle("OmniControl Agent")
             .setContentText("Connected to management server")
-            .setSmallIcon(R.drawable.ic_launcher_foreground)
+            .setSmallIcon(android.R.drawable.ic_dialog_info)
             .setOngoing(true)
             .setSilent(true)
             .build()

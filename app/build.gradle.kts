@@ -25,7 +25,7 @@ android {
 
         buildConfigField("String", "SERVER_BASE_URL",  "\"https://api.omnicontrol.internal/api/v1/\"")
         buildConfigField("String", "MQTT_BROKER_HOST", "\"api.omnicontrol.internal\"")
-        buildConfigField("Int",    "MQTT_BROKER_PORT", "1883")
+        buildConfigField("String", "MQTT_BROKER_PORT", "\"1883\"")
         buildConfigField("String", "DEVICE_API_USERNAME", "\"${prop("DEVICE_API_USERNAME")}\"")
         buildConfigField("String", "DEVICE_API_PASSWORD", "\"${prop("DEVICE_API_PASSWORD")}\"")
     }
@@ -43,7 +43,7 @@ android {
             isDebuggable = true
             buildConfigField("String", "SERVER_BASE_URL",  "\"http://192.168.133.94:8080/api/v1/\"")
             buildConfigField("String", "MQTT_BROKER_HOST", "\"192.168.133.94\"")
-            buildConfigField("Int",    "MQTT_BROKER_PORT", "1883")
+            buildConfigField("String", "MQTT_BROKER_PORT", "\"1883\"")
         }
     }
 
@@ -78,6 +78,7 @@ dependencies {
     implementation(libs.lifecycle.viewmodel.ktx)
     implementation(libs.lifecycle.livedata.ktx)
     implementation(libs.lifecycle.runtime.ktx)
+    implementation(libs.activity.ktx)
 
     implementation(libs.workmanager.ktx)
 
