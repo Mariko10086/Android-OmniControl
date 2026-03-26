@@ -1,7 +1,16 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
 }
+
+// Read local.properties for secrets (never committed to VCS)
+val localProps = Properties().apply {
+    val f = rootProject.file("local.properties")
+    if (f.exists()) load(f.inputStream())
+}
+fun prop(key: String): String = localProps.getProperty(key, "")
 
 android {
     namespace = "com.omnicontrol.agent"
@@ -14,7 +23,11 @@ android {
         versionCode = 1
         versionName = "1.0.0"
 
-        buildConfigField("String", "SERVER_BASE_URL", "\"https://api.omnicontrol.internal/v1/\"")
+        buildConfigField("String", "SERVER_BASE_URL",  "\"https://api.omnicontrol.internal/api/v1/\"")
+        buildConfigField("String", "MQTT_BROKER_HOST", "\"api.omnicontrol.internal\"")
+        buildConfigField("Int",    "MQTT_BROKER_PORT", "1883")
+        buildConfigField("String", "DEVICE_API_USERNAME", "\"${prop("DEVICE_API_USERNAME")}\"")
+        buildConfigField("String", "DEVICE_API_PASSWORD", "\"${prop("DEVICE_API_PASSWORD")}\"")
     }
 
     buildTypes {
@@ -28,8 +41,9 @@ android {
         }
         debug {
             isDebuggable = true
-            // Override with your local server for testing
-            buildConfigField("String", "SERVER_BASE_URL", "\"http://192.168.1.100:8080/v1/\"")
+            buildConfigField("String", "SERVER_BASE_URL",  "\"http://192.168.133.94:8080/api/v1/\"")
+            buildConfigField("String", "MQTT_BROKER_HOST", "\"192.168.133.94\"")
+            buildConfigField("Int",    "MQTT_BROKER_PORT", "1883")
         }
     }
 
@@ -45,6 +59,13 @@ android {
 
     kotlinOptions {
         jvmTarget = "1.8"
+    }
+
+    packaging {
+        resources {
+            excludes += "META-INF/INDEX.LIST"
+            excludes += "META-INF/io.netty.versions.properties"
+        }
     }
 }
 
@@ -67,4 +88,7 @@ dependencies {
     implementation(libs.gson)
 
     implementation(libs.coroutines.android)
+
+    implementation(libs.hivemq.mqtt.client)
+    implementation(libs.androidx.security.crypto)
 }

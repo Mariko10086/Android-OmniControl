@@ -9,6 +9,7 @@ import com.omnicontrol.agent.collector.AppStatusCollector
 import com.omnicontrol.agent.collector.DeviceInfoCollector
 import com.omnicontrol.agent.collector.StorageInfoCollector
 import com.omnicontrol.agent.config.AppConfig
+import com.omnicontrol.agent.mqtt.MqttManagerHolder
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -20,6 +21,10 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
 
     private val context = application.applicationContext
 
+    init {
+        observeMqttState()
+    }
+
     fun loadDashboard() {
         _uiState.value = _uiState.value?.copy(isLoading = true, errorMessage = null)
         viewModelScope.launch {
@@ -29,17 +34,32 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
                     val storageInfo = StorageInfoCollector(context).collect()
                     val packages = AppConfig.getTargetPackages(context)
                     val appStatuses = AppStatusCollector(context).collect(packages)
-                    DashboardUiState(
+                    _uiState.value?.copy(
+                        isLoading = false,
+                        deviceInfo = deviceInfo,
+                        storageInfo = storageInfo,
+                        appStatuses = appStatuses,
+                        errorMessage = null
+                    ) ?: DashboardUiState(
                         isLoading = false,
                         deviceInfo = deviceInfo,
                         storageInfo = storageInfo,
                         appStatuses = appStatuses
                     )
                 } catch (e: Exception) {
-                    DashboardUiState(isLoading = false, errorMessage = e.message)
+                    _uiState.value?.copy(isLoading = false, errorMessage = e.message)
+                        ?: DashboardUiState(isLoading = false, errorMessage = e.message)
                 }
             }
             _uiState.value = state
+        }
+    }
+
+    private fun observeMqttState() {
+        viewModelScope.launch {
+            MqttManagerHolder.get(context).connectionState.collect { mqttState ->
+                _uiState.value = _uiState.value?.copy(mqttConnectionState = mqttState)
+            }
         }
     }
 }

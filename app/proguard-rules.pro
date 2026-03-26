@@ -10,7 +10,12 @@
 
 # Gson data models — keep all field names for JSON serialization
 -keep class com.omnicontrol.agent.data.model.** { *; }
--keep class com.omnicontrol.agent.network.ReportResponse { *; }
+-keep class com.omnicontrol.agent.network.auth.** { *; }
+
+# HiveMQ MQTT Client
+-keep class com.hivemq.** { *; }
+-dontwarn io.netty.**
+-dontwarn org.slf4j.**
 
 # WorkManager workers
 -keep class * extends androidx.work.Worker
