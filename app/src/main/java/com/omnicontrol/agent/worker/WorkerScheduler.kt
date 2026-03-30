@@ -11,10 +11,11 @@ import com.omnicontrol.agent.config.AppConfig
 import java.util.concurrent.TimeUnit
 
 /**
- * Schedules the three periodic background workers:
+ * Schedules the four periodic background workers:
  * - [HeartbeatWorker]  — every 5 minutes, QoS 0
  * - [DeviceInfoWorker] — every [intervalMinutes] (default 15), QoS 1
  * - [AppStatusWorker]  — once per day, QoS 1
+ * - [AppGuardWorker]   — every 5 minutes, no network constraint (grant permissions + ensure apps running)
  *
  * Uses [ExistingPeriodicWorkPolicy.UPDATE] for DeviceInfoWorker so server-pushed
  * interval changes take effect immediately. HeartbeatWorker and AppStatusWorker
@@ -29,6 +30,7 @@ object WorkerScheduler {
         scheduleHeartbeat(context)
         scheduleDeviceInfo(context, deviceInfoIntervalMinutes)
         scheduleAppStatus(context)
+        scheduleAppGuard(context)
     }
 
     fun scheduleHeartbeat(context: Context) {
@@ -65,6 +67,18 @@ object WorkerScheduler {
             .build()
         WorkManager.getInstance(context).enqueueUniquePeriodicWork(
             AppStatusWorker.WORK_NAME,
+            ExistingPeriodicWorkPolicy.KEEP,
+            req
+        )
+    }
+
+    fun scheduleAppGuard(context: Context) {
+        // No network constraint — permission granting and app launching don't need network
+        val req = PeriodicWorkRequestBuilder<AppGuardWorker>(5, TimeUnit.MINUTES)
+            .setBackoffCriteria(BackoffPolicy.LINEAR, 30L, TimeUnit.SECONDS)
+            .build()
+        WorkManager.getInstance(context).enqueueUniquePeriodicWork(
+            AppGuardWorker.WORK_NAME,
             ExistingPeriodicWorkPolicy.KEEP,
             req
         )

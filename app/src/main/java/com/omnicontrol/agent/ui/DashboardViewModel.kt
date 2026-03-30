@@ -10,6 +10,8 @@ import com.omnicontrol.agent.collector.DeviceInfoCollector
 import com.omnicontrol.agent.collector.StorageInfoCollector
 import com.omnicontrol.agent.config.AppConfig
 import com.omnicontrol.agent.mqtt.MqttManagerHolder
+import com.omnicontrol.agent.system.ScreenAwakeStatus
+import com.omnicontrol.agent.system.ScreenKeepAwake
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -34,17 +36,20 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
                     val storageInfo = StorageInfoCollector(context).collect()
                     val packages = AppConfig.getTargetPackages(context)
                     val appStatuses = AppStatusCollector(context).collect(packages)
+                    val screenStatus = ScreenKeepAwake.queryCurrentStatus(context)
                     _uiState.value?.copy(
                         isLoading = false,
                         deviceInfo = deviceInfo,
                         storageInfo = storageInfo,
                         appStatuses = appStatuses,
+                        screenAwakeStatus = screenStatus,
                         errorMessage = null
                     ) ?: DashboardUiState(
                         isLoading = false,
                         deviceInfo = deviceInfo,
                         storageInfo = storageInfo,
-                        appStatuses = appStatuses
+                        appStatuses = appStatuses,
+                        screenAwakeStatus = screenStatus
                     )
                 } catch (e: Exception) {
                     _uiState.value?.copy(isLoading = false, errorMessage = e.message)
@@ -53,6 +58,10 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
             }
             _uiState.value = state
         }
+    }
+
+    fun updateScreenStatus(status: ScreenAwakeStatus) {
+        _uiState.value = _uiState.value?.copy(screenAwakeStatus = status)
     }
 
     private fun observeMqttState() {

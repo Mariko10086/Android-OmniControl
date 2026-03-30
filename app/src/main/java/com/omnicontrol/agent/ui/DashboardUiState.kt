@@ -4,6 +4,7 @@ import com.omnicontrol.agent.data.model.AppStatusInfo
 import com.omnicontrol.agent.data.model.DeviceInfo
 import com.omnicontrol.agent.data.model.StorageInfo
 import com.omnicontrol.agent.mqtt.MqttConnectionState
+import com.omnicontrol.agent.system.ScreenAwakeStatus
 
 data class DashboardUiState(
     val isLoading: Boolean = false,
@@ -11,5 +12,6 @@ data class DashboardUiState(
     val storageInfo: StorageInfo? = null,
     val appStatuses: List<AppStatusInfo> = emptyList(),
     val mqttConnectionState: MqttConnectionState = MqttConnectionState.Disconnected,
+    val screenAwakeStatus: ScreenAwakeStatus? = null,
     val errorMessage: String? = null
 )

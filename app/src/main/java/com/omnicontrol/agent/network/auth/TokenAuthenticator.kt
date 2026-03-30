@@ -40,7 +40,7 @@ class TokenAuthenticator(
         val newAccessToken = refreshResult
             ?.takeIf { it.isSuccessful }
             ?.body()
-            ?.accessToken
+            ?.data?.accessToken
 
         return if (newAccessToken != null) {
             // 15 minutes = 15 * 60 * 1000 ms

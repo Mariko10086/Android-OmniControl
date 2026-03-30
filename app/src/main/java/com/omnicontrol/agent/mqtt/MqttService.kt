@@ -4,6 +4,7 @@ import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.Service
+import android.content.pm.ServiceInfo
 import android.content.Context
 import android.content.Intent
 import android.os.Build
@@ -64,7 +65,11 @@ class MqttService : Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        startForeground(NOTIF_ID, buildNotification())
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            startForeground(NOTIF_ID, buildNotification(), ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC)
+        } else {
+            startForeground(NOTIF_ID, buildNotification())
+        }
         serviceScope.launch {
             initializeConnection()
         }
@@ -127,9 +132,19 @@ class MqttService : Service() {
 
     private suspend fun sendRegistration(deviceId: String, prefs: DevicePreferences) {
         val packages = AppConfig.getTargetPackages(applicationContext)
+        val deviceInfo = DeviceInfoCollector(applicationContext).collect()
         val payload = RegisterPayload(
             deviceId = deviceId,
-            device = DeviceInfoCollector(applicationContext).collect(),
+            deviceName = deviceInfo.deviceName,
+            manufacturer = deviceInfo.manufacturer,
+            model = deviceInfo.model,
+            androidVersion = deviceInfo.androidVersion,
+            sdkVersion = deviceInfo.sdkVersion,
+            serialNumber = deviceInfo.serialNumber,
+            imei = deviceInfo.imei,
+            ipAddress = deviceInfo.ipAddress,
+            systemLanguage = deviceInfo.systemLanguage,
+            fileWriteCheck = deviceInfo.fileWriteCheck,
             storage = StorageInfoCollector(applicationContext).collect(),
             apps = AppStatusCollector(applicationContext).collect(packages)
         )
@@ -147,9 +162,10 @@ class MqttService : Service() {
             val channel = NotificationChannel(
                 NOTIF_CHANNEL_ID,
                 "OmniControl Agent",
-                NotificationManager.IMPORTANCE_LOW
+                NotificationManager.IMPORTANCE_MIN
             ).apply {
                 description = "Keeps the device connected to the management server"
+                setShowBadge(false)
             }
             val nm = getSystemService(NotificationManager::class.java)
             nm.createNotificationChannel(channel)
@@ -163,6 +179,8 @@ class MqttService : Service() {
             .setSmallIcon(android.R.drawable.ic_dialog_info)
             .setOngoing(true)
             .setSilent(true)
+            .setPriority(NotificationCompat.PRIORITY_MIN)
+            .setVisibility(NotificationCompat.VISIBILITY_SECRET)
             .build()
     }
 

@@ -63,6 +63,29 @@
             android:textSize="13sp"
             android:layout_marginBottom="16dp" />
 
+        <!-- Screen & Lockscreen Section -->
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Screen &amp; Lockscreen"
+            android:textSize="16sp"
+            android:textStyle="bold"
+            android:layout_marginBottom="4dp" />
+
+        <TextView
+            android:id="@+id/textScreenTimeout"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:textSize="13sp"
+            android:layout_marginBottom="2dp" />
+
+        <TextView
+            android:id="@+id/textLockScreenStatus"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:textSize="13sp"
+            android:layout_marginBottom="16dp" />
+
         <!-- Storage Section -->
         <TextView
             android:layout_width="match_parent"

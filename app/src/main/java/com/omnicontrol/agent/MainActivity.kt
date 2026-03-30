@@ -1,11 +1,18 @@
 package com.omnicontrol.agent
 
+import android.os.Build
 import android.os.Bundle
 import android.view.View
+import android.view.WindowManager
 import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
+import androidx.lifecycle.lifecycleScope
 import com.omnicontrol.agent.databinding.ActivityDashboardBinding
+import com.omnicontrol.agent.system.ScreenKeepAwake
 import com.omnicontrol.agent.ui.DashboardViewModel
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 class MainActivity : AppCompatActivity() {
 
@@ -14,10 +21,33 @@ class MainActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        // Keep screen on and show above lockscreen — takes effect immediately in this Activity
+        @Suppress("DEPRECATION")
+        window.addFlags(
+            WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON or
+            WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED or
+            WindowManager.LayoutParams.FLAG_DISMISS_KEYGUARD or
+            WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON
+        )
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
+            setShowWhenLocked(true)
+            setTurnScreenOn(true)
+        }
+
         binding = ActivityDashboardBinding.inflate(layoutInflater)
         setContentView(binding.root)
         setupObservers()
         viewModel.loadDashboard()
+
+        // Apply persistent system-level settings via root shell, then refresh status
+        lifecycleScope.launch(Dispatchers.IO) {
+            val applied = ScreenKeepAwake.applySystemSettings()
+            val status = ScreenKeepAwake.queryCurrentStatus(this@MainActivity, applied)
+            withContext(Dispatchers.Main) {
+                viewModel.updateScreenStatus(status)
+            }
+        }
     }
 
     override fun onResume() {
@@ -67,6 +97,19 @@ class MainActivity : AppCompatActivity() {
                 binding.textAppStatuses.text = appsText
             } else {
                 binding.textAppStatuses.text = "No packages configured"
+            }
+
+            state.screenAwakeStatus?.let { s ->
+                val timeoutText = if (s.screenTimeoutMs == Int.MAX_VALUE.toLong()) {
+                    "Screen Timeout: Never (max)"
+                } else if (s.screenTimeoutMs < 0) {
+                    "Screen Timeout: Unknown"
+                } else {
+                    "Screen Timeout: ${s.screenTimeoutMs / 1000}s"
+                }
+                binding.textScreenTimeout.text = timeoutText
+                binding.textLockScreenStatus.text =
+                    "Lockscreen: ${if (s.lockScreenDisabled) "Disabled ✓" else "Enabled"}"
             }
 
             if (state.errorMessage != null) {

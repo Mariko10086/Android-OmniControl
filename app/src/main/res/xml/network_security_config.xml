@@ -3,6 +3,7 @@
     <!-- Allow cleartext only for local debug hosts -->
     <domain-config cleartextTrafficPermitted="true">
         <domain includeSubdomains="true">192.168.1.100</domain>
+        <domain includeSubdomains="true">192.168.133.94</domain>
         <domain includeSubdomains="true">10.0.2.2</domain>
     </domain-config>
     <!-- All other traffic must use HTTPS -->

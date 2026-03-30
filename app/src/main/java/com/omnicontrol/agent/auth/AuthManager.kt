@@ -46,7 +46,7 @@ class AuthManager(
         val refreshToken = prefs.getRefreshToken() ?: return false
         return try {
             val response = authApiService.refresh(RefreshRequest(refreshToken))
-            val newToken = response.takeIf { it.isSuccessful }?.body()?.accessToken
+            val newToken = response.takeIf { it.isSuccessful }?.body()?.data?.accessToken
             if (newToken != null) {
                 prefs.saveAccessToken(newToken, ACCESS_TOKEN_LIFETIME_MS)
                 true
@@ -68,9 +68,9 @@ class AuthManager(
                     password = BuildConfig.DEVICE_API_PASSWORD
                 )
             )
-            val body = response.takeIf { it.isSuccessful }?.body()
+            val body = response.takeIf { it.isSuccessful }?.body()?.data
             if (body != null) {
-                prefs.saveTokens(body.accessToken, body.refreshToken, ACCESS_TOKEN_LIFETIME_MS)
+                prefs.saveTokens(body.accessToken, body.refreshToken ?: "", ACCESS_TOKEN_LIFETIME_MS)
                 true
             } else {
                 Log.e(TAG, "Login failed: HTTP ${response.code()}")

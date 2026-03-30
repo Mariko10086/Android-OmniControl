@@ -1,14 +1,12 @@
 package com.omnicontrol.agent.update
 
 import android.content.Context
-import android.content.Intent
-import android.net.Uri
 import android.os.Build
 import android.util.Log
-import androidx.core.content.FileProvider
 import com.omnicontrol.agent.data.model.mqtt.UpdateCommandPayload
 import com.omnicontrol.agent.data.model.mqtt.UpdateResultPayload
 import com.omnicontrol.agent.data.prefs.DevicePreferences
+import com.omnicontrol.agent.system.SystemInstaller
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
@@ -22,11 +20,8 @@ import java.util.concurrent.TimeUnit
  * Handles the full APK update pipeline:
  * 1. Download the APK to the cache directory.
  * 2. Verify MD5 checksum.
- * 3. Trigger installation via ACTION_VIEW.
+ * 3. Silent install via pm install (requires root / system-app privileges).
  * 4. Return a [UpdateResultPayload] to be reported back to the server.
- *
- * Note: Silent install requires Device Owner / system privileges.
- * This implementation uses ACTION_VIEW which shows the standard Android install dialog.
  */
 class UpdateInstaller(private val context: Context) {
 
@@ -39,6 +34,8 @@ class UpdateInstaller(private val context: Context) {
         .connectTimeout(30, TimeUnit.SECONDS)
         .readTimeout(DOWNLOAD_TIMEOUT_SECONDS, TimeUnit.SECONDS)
         .build()
+
+    private val systemInstaller = SystemInstaller()
 
     suspend fun install(command: UpdateCommandPayload): UpdateResultPayload {
         val deviceId = DevicePreferences(context).getOrCreateDeviceId()
@@ -62,8 +59,18 @@ class UpdateInstaller(private val context: Context) {
                 )
             }
 
-            // Step 3: Trigger install
-            triggerInstall(apkFile)
+            // Step 3: Silent install via pm
+            val installed = systemInstaller.installApk(apkFile)
+            if (!installed) {
+                apkFile.delete()
+                return UpdateResultPayload(
+                    taskUuid = command.taskUuid,
+                    deviceId = deviceId,
+                    success = false,
+                    errorMessage = "pm install failed — check SystemInstaller logs",
+                    installedVersionCode = null
+                )
+            }
 
             // Read back installed version
             val installedVersionCode = try {
@@ -99,7 +106,7 @@ class UpdateInstaller(private val context: Context) {
         }
     }
 
-    private suspend fun downloadApk(url: String, dest: File) = withContext(Dispatchers.IO) {
+    internal suspend fun downloadApk(url: String, dest: File) = withContext(Dispatchers.IO) {
         val request = Request.Builder().url(url).build()
         val response = downloadClient.newCall(request).execute()
         if (!response.isSuccessful) {
@@ -110,7 +117,7 @@ class UpdateInstaller(private val context: Context) {
         } ?: throw IOException("Empty response body")
     }
 
-    private fun computeMd5(file: File): String {
+    internal fun computeMd5(file: File): String {
         val digest = MessageDigest.getInstance("MD5")
         file.inputStream().use { stream ->
             val buffer = ByteArray(8192)
@@ -122,23 +129,4 @@ class UpdateInstaller(private val context: Context) {
         return digest.digest().joinToString("") { "%02x".format(it) }
     }
 
-    private fun triggerInstall(apkFile: File) {
-        val uri: Uri = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-            FileProvider.getUriForFile(
-                context,
-                "${context.packageName}.fileprovider",
-                apkFile
-            )
-        } else {
-            @Suppress("DEPRECATION")
-            Uri.fromFile(apkFile)
-        }
-
-        val intent = Intent(Intent.ACTION_VIEW).apply {
-            setDataAndType(uri, "application/vnd.android.package-archive")
-            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-        }
-        context.startActivity(intent)
-    }
 }

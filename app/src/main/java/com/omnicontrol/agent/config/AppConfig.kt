@@ -27,7 +27,8 @@ object AppConfig {
 
     val DEFAULT_TARGET_PACKAGES: List<String> = listOf(
         "com.sqh.market",
-        "com.magicalbox.devicegather"
+        "com.magicalbox.devicegather",
+        "com.android.webview"
     )
 
     // ── Server URL (REST) ────────────────────────────────────────────────────

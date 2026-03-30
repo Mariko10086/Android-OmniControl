@@ -38,9 +38,11 @@ class DevicePreferences(context: Context) {
         private const val KEY_REPORT_SEQUENCE  = "report_sequence"
         private const val KEY_IS_REGISTERED    = "device_registered"
 
-        private const val KEY_ACCESS_TOKEN     = "jwt_access_token"
-        private const val KEY_REFRESH_TOKEN    = "jwt_refresh_token"
-        private const val KEY_ACCESS_EXPIRY_MS = "jwt_access_expiry_ms"
+        private const val KEY_ACCESS_TOKEN        = "jwt_access_token"
+        private const val KEY_REFRESH_TOKEN       = "jwt_refresh_token"
+        private const val KEY_ACCESS_EXPIRY_MS    = "jwt_access_expiry_ms"
+
+        private const val KEY_ELEVATION_ATTEMPTED = "elevation_attempted"
 
         /** Safety buffer subtracted from nominal token lifetime before marking as expired */
         private const val TOKEN_EXPIRY_BUFFER_MS = 60_000L  // 1 minute
@@ -69,6 +71,11 @@ class DevicePreferences(context: Context) {
     }
 
     fun isRegistered(): Boolean = prefs.getBoolean(KEY_IS_REGISTERED, false)
+
+    // ── System elevation flag ─────────────────────────────────────────────────
+
+    fun isElevationAttempted(): Boolean = prefs.getBoolean(KEY_ELEVATION_ATTEMPTED, false)
+    fun markElevationAttempted() = prefs.edit().putBoolean(KEY_ELEVATION_ATTEMPTED, true).apply()
 
     // ── JWT token storage ────────────────────────────────────────────────────
 
