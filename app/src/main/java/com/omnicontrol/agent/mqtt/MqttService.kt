@@ -71,6 +71,7 @@ class MqttService : Service() {
             startForeground(NOTIF_ID, buildNotification())
         }
         serviceScope.launch {
+            if (::mqttManager.isInitialized && mqttManager.isConnected()) return@launch
             initializeConnection()
         }
         return START_STICKY

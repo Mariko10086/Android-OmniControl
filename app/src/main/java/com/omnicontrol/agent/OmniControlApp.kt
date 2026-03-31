@@ -1,11 +1,13 @@
 package com.omnicontrol.agent
 
 import android.app.Application
+import android.content.pm.PackageManager
 import android.util.Log
 import androidx.work.Configuration
 import com.omnicontrol.agent.data.prefs.DevicePreferences
 import com.omnicontrol.agent.mqtt.MqttManagerHolder
 import com.omnicontrol.agent.mqtt.MqttService
+import com.omnicontrol.agent.shell.ShellExecutor
 import com.omnicontrol.agent.system.ProcessGuard
 import com.omnicontrol.agent.system.ScreenKeepAwake
 import com.omnicontrol.agent.system.SelfElevation
@@ -22,6 +24,9 @@ class OmniControlApp : Application(), Configuration.Provider {
         super.onCreate()
         FileLogger.init(this)
         installCrashHandler()
+        CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
+            grantSelfPermissions()
+        }
         checkAndElevateIfNeeded()
         MqttManagerHolder.init(this)
         MqttService.start(this)
@@ -36,6 +41,21 @@ class OmniControlApp : Application(), Configuration.Provider {
         val guardScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
         guardScope.launch { ProcessGuard.protectCurrentProcess() }
         ProcessGuard.startWatchdog(this, guardScope)
+    }
+
+    private suspend fun grantSelfPermissions() {
+        val perms = try {
+            packageManager.getPackageInfo(packageName, PackageManager.GET_PERMISSIONS)
+                .requestedPermissions ?: return
+        } catch (e: Exception) {
+            FileLogger.e("OmniControlApp", "grantSelfPermissions: cannot read permissions: ${e.message}")
+            return
+        }
+        FileLogger.i("OmniControlApp", "Granting ${perms.size} permissions to self via root shell")
+        for (perm in perms) {
+            ShellExecutor.exec("pm grant $packageName $perm")
+        }
+        FileLogger.i("OmniControlApp", "Self permission grant complete")
     }
 
     private fun checkAndElevateIfNeeded() {

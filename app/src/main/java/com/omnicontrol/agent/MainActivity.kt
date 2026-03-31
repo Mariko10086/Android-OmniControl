@@ -1,7 +1,11 @@
 package com.omnicontrol.agent
 
+import android.content.Intent
+import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.os.PowerManager
+import android.provider.Settings
 import android.view.View
 import android.view.WindowManager
 import androidx.activity.viewModels
@@ -35,6 +39,8 @@ class MainActivity : AppCompatActivity() {
             setTurnScreenOn(true)
         }
 
+        requestBatteryOptimizationExemption()
+
         binding = ActivityDashboardBinding.inflate(layoutInflater)
         setContentView(binding.root)
         setupObservers()
@@ -46,6 +52,19 @@ class MainActivity : AppCompatActivity() {
             val status = ScreenKeepAwake.queryCurrentStatus(this@MainActivity, applied)
             withContext(Dispatchers.Main) {
                 viewModel.updateScreenStatus(status)
+            }
+        }
+    }
+
+    private fun requestBatteryOptimizationExemption() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            val pm = getSystemService(PowerManager::class.java)
+            if (!pm.isIgnoringBatteryOptimizations(packageName)) {
+                startActivity(
+                    Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS).apply {
+                        data = Uri.parse("package:$packageName")
+                    }
+                )
             }
         }
     }
@@ -64,8 +83,8 @@ class MainActivity : AppCompatActivity() {
                 binding.textDeviceId.text = "Device ID: ${d.deviceId}"
                 binding.textModel.text = "Model: ${d.manufacturer} ${d.model}"
                 binding.textAndroidVersion.text =
-                    "Android: ${d.androidVersion} (API ${d.sdkInt})"
-                binding.textBrand.text = "Brand: ${d.brand} / ${d.product}"
+                    "Android: ${d.androidVersion} (API ${d.sdkVersion})"
+                binding.textBrand.text = "Language: ${d.systemLanguage}"
             }
 
             state.storageInfo?.let { s ->
