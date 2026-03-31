@@ -1,4 +1,4 @@
-package com.omnicontrol.agent.mqtt
+﻿package com.omnicontrol.agent.mqtt
 
 import android.content.Context
 import android.util.Log
@@ -41,6 +41,7 @@ class MqttManager(private val context: Context) {
     fun isConnected(): Boolean = client?.state?.isConnected == true
 
     suspend fun connect(host: String, port: Int, clientId: String) {
+        if (client?.state?.isConnected == true) return
         _connectionState.value = MqttConnectionState.Connecting
         Log.d(TAG, "Connecting to $host:$port as $clientId")
 
@@ -70,7 +71,7 @@ class MqttManager(private val context: Context) {
 
         suspendCancellableCoroutine<Unit> { cont ->
             client!!.connectWith()
-                .cleanSession(false)
+                .cleanSession(true)
                 .keepAlive(KEEP_ALIVE_SECONDS)
                 .send()
                 .whenComplete { _, ex ->
@@ -107,7 +108,9 @@ class MqttManager(private val context: Context) {
 
     private suspend fun publish(topic: String, payload: Any, qos: MqttQos) {
         val c = client ?: throw IllegalStateException("MQTT client not connected")
-        val json = gson.toJson(payload).toByteArray(Charsets.UTF_8)
+        val jsonString = gson.toJson(payload)
+        Log.i(TAG, "MQTT_UPLOAD topic=$topic qos=${qos.code} payload=$jsonString")
+        val json = jsonString.toByteArray(Charsets.UTF_8)
 
         suspendCancellableCoroutine<Unit> { cont ->
             c.publishWith()
@@ -161,3 +164,4 @@ class MqttManager(private val context: Context) {
         }
     }
 }
+
