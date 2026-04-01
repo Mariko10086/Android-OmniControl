@@ -58,6 +58,13 @@ class MqttService : Service() {
     private lateinit var mqttManager: MqttManager
     private lateinit var updateInstaller: UpdateInstaller
 
+    /** 防止 onStartCommand 多次调用时重复启动 initializeConnection 协程 */
+    @Volatile
+    private var connectionInitialized = false
+
+    /** 监听 connectionState 的协程 Job，确保只有一个存活 */
+    private var connectionStateJob: kotlinx.coroutines.Job? = null
+
     override fun onCreate() {
         super.onCreate()
         createNotificationChannel()
@@ -71,6 +78,8 @@ class MqttService : Service() {
             startForeground(NOTIF_ID, buildNotification())
         }
         serviceScope.launch {
+            if (connectionInitialized) return@launch
+            connectionInitialized = true
             if (::mqttManager.isInitialized && mqttManager.isConnected()) return@launch
             initializeConnection()
         }
@@ -109,7 +118,8 @@ class MqttService : Service() {
 
         // 监听连接状态变化：每次连接成功（含重连）都重新发注册消息
         // 服务端 register handler 是 upsert 幂等操作，重复注册安全
-        serviceScope.launch {
+        connectionStateJob?.cancel()
+        connectionStateJob = serviceScope.launch {
             mqttManager.connectionState.collect { state ->
                 if (state == MqttConnectionState.Connected) {
                     FileLogger.i(TAG, "MQTT connected/reconnected, sending registration for $deviceId")
