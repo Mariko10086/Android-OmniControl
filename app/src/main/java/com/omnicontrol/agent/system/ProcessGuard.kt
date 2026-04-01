@@ -1,5 +1,6 @@
 package com.omnicontrol.agent.system
 
+import android.app.ActivityManager
 import android.content.Context
 import android.util.Log
 import com.omnicontrol.agent.shell.ShellExecutor
@@ -20,14 +21,13 @@ object ProcessGuard {
 
     /**
      * 将当前进程的 oom_score_adj 调整为最低，提升存活优先级。
-     * 需要 root 权限。
+     * 需要 root 权限；非 root 环境下静默失败不影响功能。
      */
     suspend fun protectCurrentProcess() {
         val pid = android.os.Process.myPid()
-        // ShellExecutor 内部已做 su 不存在降级，不会抛异常
-        ShellExecutor.exec("echo -17 > /proc/$pid/oom_adj")
+        // oom_adj 在 Android 7+ 内核已废弃（只读），只写 oom_score_adj 即可
         ShellExecutor.exec("echo -1000 > /proc/$pid/oom_score_adj")
-        Log.i(TAG, "Process $pid oom_adj adjustment requested (root may be unavailable on this device)")
+        Log.i(TAG, "Process $pid oom_score_adj=-1000 requested (needs root; silently ignored if unavailable)")
     }
 
     /**
@@ -47,13 +47,30 @@ object ProcessGuard {
     }
 
     private fun ensureMqttServiceRunning(context: Context) {
-        val serviceName = "com.omnicontrol.agent/com.omnicontrol.agent.mqtt.MqttService"
-        val output = ShellExecutor.execWithResult("dumpsys activity services $serviceName")
-        if (output.isNullOrBlank() || !output.contains("ServiceRecord")) {
-            Log.w(TAG, "MqttService not found, restarting...")
-            com.omnicontrol.agent.mqtt.MqttService.start(context)
-        } else {
+        if (isMqttServiceRunning(context)) {
             Log.d(TAG, "MqttService is running")
+            return
+        }
+        Log.w(TAG, "MqttService not running, restarting...")
+        com.omnicontrol.agent.mqtt.MqttService.start(context)
+    }
+
+    /**
+     * 通过 ActivityManager 在 Java 层判断 MqttService 是否运行，
+     * 避免依赖 dumpsys（非 root 环境下输出不可靠，易误判导致反复重启）。
+     */
+    @Suppress("DEPRECATION")
+    private fun isMqttServiceRunning(context: Context): Boolean {
+        val am = context.getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
+        val targetClass = com.omnicontrol.agent.mqtt.MqttService::class.java.name
+        return try {
+            // getRunningServices 在 Android 8+ 对第三方 App 只返回自身进程的服务，
+            // 但因为我们就是在检查自身服务，这里完全够用。
+            am.getRunningServices(50)?.any { it.service.className == targetClass } == true
+        } catch (e: Exception) {
+            Log.w(TAG, "isMqttServiceRunning check failed: ${e.message}")
+            // 检查失败时保守处理，不触发重启
+            true
         }
     }
 }
