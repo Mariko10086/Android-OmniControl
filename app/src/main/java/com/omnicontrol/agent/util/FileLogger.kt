@@ -70,6 +70,11 @@ object FileLogger {
         }
     }
 
+    fun v(tag: String, msg: String) {
+        Log.v(tag, msg)
+        write("V", tag, msg)
+    }
+
     fun i(tag: String, msg: String) {
         Log.i(tag, msg)
         write("I", tag, msg)
