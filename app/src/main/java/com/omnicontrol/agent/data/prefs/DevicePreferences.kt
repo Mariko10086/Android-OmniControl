@@ -36,7 +36,6 @@ class DevicePreferences(context: Context) {
 
         private const val KEY_DEVICE_ID        = "device_id"
         private const val KEY_REPORT_SEQUENCE  = "report_sequence"
-        private const val KEY_IS_REGISTERED    = "device_registered"
 
         private const val KEY_ACCESS_TOKEN        = "jwt_access_token"
         private const val KEY_REFRESH_TOKEN       = "jwt_refresh_token"
@@ -63,14 +62,6 @@ class DevicePreferences(context: Context) {
         prefs.edit().putLong(KEY_REPORT_SEQUENCE, next).apply()
         return next
     }
-
-    // ── Registration flag ────────────────────────────────────────────────────
-
-    fun markRegistered() {
-        prefs.edit().putBoolean(KEY_IS_REGISTERED, true).apply()
-    }
-
-    fun isRegistered(): Boolean = prefs.getBoolean(KEY_IS_REGISTERED, false)
 
     // ── System elevation flag ─────────────────────────────────────────────────
 

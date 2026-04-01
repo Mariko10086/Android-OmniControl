@@ -103,9 +103,11 @@ class MqttService : Service() {
             return
         }
 
-        if (!prefs.isRegistered()) {
-            sendRegistration(deviceId, prefs)
-        }
+        // Always send registration on every connect.
+        // The server-side register handler is idempotent (upsert by device_id),
+        // so re-registering is safe and ensures the device appears in the dashboard
+        // even after the server database is reset or the device record is deleted.
+        sendRegistration(deviceId)
 
         mqttManager.subscribeToUpdateCommands(deviceId) { command ->
             serviceScope.launch {
@@ -131,7 +133,7 @@ class MqttService : Service() {
         }
     }
 
-    private suspend fun sendRegistration(deviceId: String, prefs: DevicePreferences) {
+    private suspend fun sendRegistration(deviceId: String) {
         val packages = AppConfig.getTargetPackages(applicationContext)
         val deviceInfo = DeviceInfoCollector(applicationContext).collect()
         val payload = RegisterPayload(
@@ -151,7 +153,6 @@ class MqttService : Service() {
         )
         try {
             mqttManager.publishQos1(MqttTopics.register(deviceId), payload)
-            prefs.markRegistered()
             Log.i(TAG, "Device registered: $deviceId")
         } catch (e: Exception) {
             Log.e(TAG, "Registration publish failed: ${e.message}")
