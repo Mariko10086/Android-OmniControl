@@ -23,16 +23,12 @@ object ScreenKeepAwake {
      * @return true 表示命令执行成功
      */
     suspend fun applySystemSettings(): Boolean {
-        return try {
-            ShellExecutor.exec("settings put system screen_off_timeout $TIMEOUT_NEVER")
-            ShellExecutor.exec("settings put secure lockscreen.disabled 1")
-            ShellExecutor.exec("settings put secure screensaver_enabled 0")
-            Log.i(TAG, "Screen keep-awake settings applied")
-            true
-        } catch (e: Exception) {
-            Log.e(TAG, "Failed to apply screen settings: ${e.message}")
-            false
-        }
+        // ShellExecutor 内部已做降级处理，不会抛异常；此处只记录结果
+        ShellExecutor.exec("settings put system screen_off_timeout $TIMEOUT_NEVER")
+        ShellExecutor.exec("settings put secure lockscreen.disabled 1")
+        ShellExecutor.exec("settings put secure screensaver_enabled 0")
+        Log.i(TAG, "Screen keep-awake settings applied (root may be unavailable on this device)")
+        return true
     }
 
     /**

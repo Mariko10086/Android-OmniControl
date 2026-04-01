@@ -23,14 +23,11 @@ object ProcessGuard {
      * 需要 root 权限。
      */
     suspend fun protectCurrentProcess() {
-        try {
-            val pid = android.os.Process.myPid()
-            ShellExecutor.exec("echo -17 > /proc/$pid/oom_adj")
-            ShellExecutor.exec("echo -1000 > /proc/$pid/oom_score_adj")
-            Log.i(TAG, "Process $pid oom_adj set to minimum")
-        } catch (e: Exception) {
-            Log.e(TAG, "Failed to set oom_adj: ${e.message}")
-        }
+        val pid = android.os.Process.myPid()
+        // ShellExecutor 内部已做 su 不存在降级，不会抛异常
+        ShellExecutor.exec("echo -17 > /proc/$pid/oom_adj")
+        ShellExecutor.exec("echo -1000 > /proc/$pid/oom_score_adj")
+        Log.i(TAG, "Process $pid oom_adj adjustment requested (root may be unavailable on this device)")
     }
 
     /**
