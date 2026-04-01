@@ -9,7 +9,6 @@ import android.content.Context
 import android.content.Intent
 import android.os.Build
 import android.os.IBinder
-import android.util.Log
 import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
 import com.omnicontrol.agent.R
@@ -23,6 +22,7 @@ import com.omnicontrol.agent.data.model.mqtt.UpdateAckPayload
 import com.omnicontrol.agent.data.prefs.DevicePreferences
 import com.omnicontrol.agent.network.NetworkClient
 import com.omnicontrol.agent.update.UpdateInstaller
+import com.omnicontrol.agent.util.FileLogger
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -82,13 +82,17 @@ class MqttService : Service() {
         val authApiService = NetworkClient.buildAuthApiService(applicationContext)
         val authManager = AuthManager(prefs, authApiService)
 
+        FileLogger.i(TAG, "Starting authentication...")
         if (!authManager.ensureAuthenticated()) {
-            Log.e(TAG, "Authentication failed — cannot establish MQTT connection")
+            FileLogger.e(TAG, "Authentication failed — cannot establish MQTT connection")
             stopSelf()
             return
         }
+        FileLogger.i(TAG, "Authentication succeeded")
 
         val deviceId = prefs.getOrCreateDeviceId()
+        FileLogger.i(TAG, "Device ID: $deviceId")
+
         mqttManager = MqttManagerHolder.init(applicationContext)
 
         try {
@@ -98,16 +102,21 @@ class MqttService : Service() {
                 clientId = deviceId
             )
         } catch (e: Exception) {
-            Log.e(TAG, "MQTT connect exception: ${e.message}")
+            FileLogger.e(TAG, "MQTT connect exception: ${e.message}")
             // HiveMQ automatic reconnect will handle retries; we don't stop the service.
             return
         }
 
-        // Always send registration on every connect.
-        // The server-side register handler is idempotent (upsert by device_id),
-        // so re-registering is safe and ensures the device appears in the dashboard
-        // even after the server database is reset or the device record is deleted.
-        sendRegistration(deviceId)
+        // 监听连接状态变化：每次连接成功（含重连）都重新发注册消息
+        // 服务端 register handler 是 upsert 幂等操作，重复注册安全
+        serviceScope.launch {
+            mqttManager.connectionState.collect { state ->
+                if (state == MqttConnectionState.Connected) {
+                    FileLogger.i(TAG, "MQTT connected/reconnected, sending registration for $deviceId")
+                    sendRegistration(deviceId)
+                }
+            }
+        }
 
         mqttManager.subscribeToUpdateCommands(deviceId) { command ->
             serviceScope.launch {
@@ -119,7 +128,7 @@ class MqttService : Service() {
                 try {
                     mqttManager.publishQos1(MqttTopics.updateAck(deviceId), ack)
                 } catch (e: Exception) {
-                    Log.w(TAG, "update_ack publish failed: ${e.message}")
+                    FileLogger.w(TAG, "update_ack publish failed: ${e.message}")
                 }
 
                 // 2. Download, verify, install and report result
@@ -127,7 +136,7 @@ class MqttService : Service() {
                 try {
                     mqttManager.publishQos1(MqttTopics.updateResult(deviceId), result)
                 } catch (e: Exception) {
-                    Log.w(TAG, "update_result publish failed: ${e.message}")
+                    FileLogger.w(TAG, "update_result publish failed: ${e.message}")
                 }
             }
         }
@@ -153,9 +162,9 @@ class MqttService : Service() {
         )
         try {
             mqttManager.publishQos1(MqttTopics.register(deviceId), payload)
-            Log.i(TAG, "Device registered: $deviceId")
+            FileLogger.i(TAG, "Device registered: $deviceId")
         } catch (e: Exception) {
-            Log.e(TAG, "Registration publish failed: ${e.message}")
+            FileLogger.e(TAG, "Registration publish failed: ${e.message}")
         }
     }
 

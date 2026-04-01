@@ -22,11 +22,18 @@ class OmniControlApp : Application(), Configuration.Provider {
 
     override fun onCreate() {
         super.onCreate()
+        // 先用内部目录初始化日志，确保 crash handler 等最早期日志有地方写
         FileLogger.init(this)
         installCrashHandler()
+
+        // 权限授予完成后重新初始化日志，升级到外部存储路径
         CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
             grantSelfPermissions()
+            // 权限授完后重新 init，尝试写到 getExternalFilesDir / /sdcard/
+            FileLogger.init(applicationContext)
+            FileLogger.i("OmniControlApp", "FileLogger re-initialized after permission grant")
         }
+
         checkAndElevateIfNeeded()
         MqttManagerHolder.init(this)
         MqttService.start(this)

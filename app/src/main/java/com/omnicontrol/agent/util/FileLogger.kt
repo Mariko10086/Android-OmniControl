@@ -1,6 +1,7 @@
 package com.omnicontrol.agent.util
 
 import android.content.Context
+import android.os.Build
 import android.os.Environment
 import android.util.Log
 import java.io.File
@@ -11,8 +12,15 @@ import java.util.Locale
 
 /**
  * 文件日志工具：将日志同时输出到 logcat 和本地文件。
- * 优先写入 /sdcard/omnicontrol/omnicontrol.log，失败时回退到应用私有目录 files/omnicontrol.log。
- * 文件超过 5MB 时自动轮转。
+ *
+ * 写入策略（按优先级）：
+ *  1. Android 10+：使用 context.getExternalFilesDir(null)（无需存储权限）
+ *     路径：/sdcard/Android/data/com.omnicontrol.agent/files/omnicontrol.log
+ *  2. Android 9 及以下：使用 /sdcard/omnicontrol/omnicontrol.log（需 WRITE_EXTERNAL_STORAGE）
+ *  3. 以上均失败时回退到应用内部私有目录 files/omnicontrol.log
+ *
+ * 文件超过 5MB 时自动删除轮转。
+ * init() 可安全地被多次调用（重新定位日志文件，例如权限授予后重初始化）。
  */
 object FileLogger {
 
@@ -24,20 +32,41 @@ object FileLogger {
     @Volatile
     private var logFile: File? = null
 
+    /**
+     * 初始化日志文件路径。
+     * 可在权限授予后再次调用以升级到外部存储路径。
+     */
     fun init(context: Context) {
-        val publicDir = File(Environment.getExternalStorageDirectory(), PUBLIC_DIR_NAME)
-        val publicFile = File(publicDir, LOG_FILE_NAME)
+        logFile = resolveLogFile(context)
+        Log.i("FileLogger", "Log file path: ${logFile?.absolutePath}")
+    }
 
-        logFile = try {
-            if (!publicDir.exists()) {
-                publicDir.mkdirs()
+    private fun resolveLogFile(context: Context): File {
+        // Android 10+：getExternalFilesDir 无需任何存储权限
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            val dir = context.getExternalFilesDir(null)
+            if (dir != null) {
+                return tryCreateFile(dir, LOG_FILE_NAME)
+                    ?: File(context.filesDir, LOG_FILE_NAME)
             }
-            if (!publicFile.exists()) {
-                publicFile.createNewFile()
-            }
-            publicFile
+        }
+
+        // Android 9 及以下：尝试写 /sdcard/omnicontrol/
+        val publicDir = File(Environment.getExternalStorageDirectory(), PUBLIC_DIR_NAME)
+        tryCreateFile(publicDir, LOG_FILE_NAME)?.let { return it }
+
+        // 最终回退：内部私有目录
+        return File(context.filesDir, LOG_FILE_NAME)
+    }
+
+    private fun tryCreateFile(dir: File, name: String): File? {
+        return try {
+            if (!dir.exists()) dir.mkdirs()
+            val file = File(dir, name)
+            if (!file.exists()) file.createNewFile()
+            if (file.canWrite()) file else null
         } catch (_: Exception) {
-            File(context.filesDir, LOG_FILE_NAME)
+            null
         }
     }
 
