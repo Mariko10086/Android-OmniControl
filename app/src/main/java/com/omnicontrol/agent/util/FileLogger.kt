@@ -42,18 +42,27 @@ object FileLogger {
     }
 
     private fun resolveLogFile(context: Context): File {
-        // Android 10+：getExternalFilesDir 无需任何存储权限
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            val dir = context.getExternalFilesDir(null)
-            if (dir != null) {
-                return tryCreateFile(dir, LOG_FILE_NAME)
-                    ?: File(context.filesDir, LOG_FILE_NAME)
-            }
-        }
+        // 外部存储未挂载时（部分 MTK 机型启动阶段），直接回退内部目录，不尝试外部路径
+        val storageState = Environment.getExternalStorageState()
+        val externalMounted = storageState == Environment.MEDIA_MOUNTED
 
-        // Android 9 及以下：尝试写 /sdcard/omnicontrol/
-        val publicDir = File(Environment.getExternalStorageDirectory(), PUBLIC_DIR_NAME)
-        tryCreateFile(publicDir, LOG_FILE_NAME)?.let { return it }
+        if (externalMounted) {
+            // Android 10+：getExternalFilesDir 无需任何存储权限
+            // 路径：/sdcard/Android/data/com.omnicontrol.agent/files/omnicontrol.log
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                val dir = context.getExternalFilesDir(null)
+                if (dir != null) {
+                    tryCreateFile(dir, LOG_FILE_NAME)?.let { return it }
+                }
+            } else {
+                // Android 9 及以下：尝试写 /sdcard/omnicontrol/
+                val publicDir = File(Environment.getExternalStorageDirectory(), PUBLIC_DIR_NAME)
+                tryCreateFile(publicDir, LOG_FILE_NAME)?.let { return it }
+            }
+            Log.w("FileLogger", "External storage mounted but write failed, falling back to internal dir")
+        } else {
+            Log.w("FileLogger", "External storage not mounted (state=$storageState), using internal dir")
+        }
 
         // 最终回退：内部私有目录
         return File(context.filesDir, LOG_FILE_NAME)
