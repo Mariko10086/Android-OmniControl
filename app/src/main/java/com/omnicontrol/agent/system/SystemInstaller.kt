@@ -1,7 +1,7 @@
 package com.omnicontrol.agent.system
 
 import android.util.Log
-import com.levine.as.utils.XShell
+import com.levine.`as`.utils.XShell
 import java.io.File
 
 /**
