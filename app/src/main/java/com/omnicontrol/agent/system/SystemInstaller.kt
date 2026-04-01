@@ -1,16 +1,11 @@
 package com.omnicontrol.agent.system
 
 import android.util.Log
-import com.levine.`as`.utils.XShell
+import com.omnicontrol.agent.shell.ShellExecutor
 import java.io.File
 
 /**
- * 通过设备厂商提供的 XShell（/system/xbin/xshell）或降级 su
- * 执行 pm install 静默安装 APK。
- *
- * XShell 优先级：
- *   /system/xbin/xshell 存在 → xshell 0（厂商特权 shell，无弹框）
- *   否则                     → su（标准 Root）
+ * 通过 root shell（su）执行 pm install 静默安装 APK。
  */
 class SystemInstaller {
 
@@ -28,16 +23,16 @@ class SystemInstaller {
         }
 
         // 确保文件可被 pm 读取
-        XShell.execCommand("chmod 644 ${apkFile.absolutePath}", true, false)
+        ShellExecutor.exec("chmod 644 ${apkFile.absolutePath}")
 
         val cmd = "pm install -r -d \"${apkFile.absolutePath}\""
-        val result = XShell.execCommand(cmd, true, true)
+        val result = ShellExecutor.execWithResult(cmd)
 
-        return if (result.result == 0) {
-            Log.i(TAG, "Install success: ${apkFile.name} | ${result.successMsg?.trim()}")
+        return if (result != null) {
+            Log.i(TAG, "Install success: ${apkFile.name} | $result")
             true
         } else {
-            Log.e(TAG, "Install failed [${result.result}] | stderr: ${result.errorMsg?.trim()}")
+            Log.e(TAG, "Install failed: ${apkFile.name}")
             false
         }
     }

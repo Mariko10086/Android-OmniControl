@@ -4,15 +4,15 @@ import android.content.Context
 import android.util.Log
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
-import com.levine.`as`.utils.XShell
 import com.omnicontrol.agent.config.AppConfig
+import com.omnicontrol.agent.shell.ShellExecutor
 
 /**
  * 每 5 分钟执行一次的守护 Worker：
  *  1. 对 [AppConfig.getTargetPackages] 中的每个包：
  *     a. pm grant — 授予运行时权限
  *     b. 检查进程是否存活，若未运行则通过 monkey 拉起
- *  2. 全程通过 XShell（xshell/su）执行，无需用户交互
+ *  2. 全程通过 ShellExecutor (su) 执行，无需用户交互
  */
 class AppGuardWorker(
     context: Context,
@@ -58,12 +58,12 @@ class AppGuardWorker(
 
     private fun grantPermissions(pkg: String) {
         for (permission in RUNTIME_PERMISSIONS) {
-            val result = XShell.execCommand("pm grant $pkg $permission", true, false)
-            if (result.result == 0) {
+            val result = ShellExecutor.execWithResult("pm grant $pkg $permission")
+            if (result != null) {
                 Log.d(TAG, "Granted $permission → $pkg")
             } else {
-                // 权限不存在或已授予时 pm 也可能返回非 0，不视为致命错误
-                Log.v(TAG, "Grant skipped [$pkg] $permission (code=${result.result})")
+                // 权限不存在或已授予时不视为致命错误
+                Log.v(TAG, "Grant skipped [$pkg] $permission")
             }
         }
     }
@@ -77,16 +77,13 @@ class AppGuardWorker(
         }
 
         Log.i(TAG, "$pkg not running, launching via monkey...")
-        val result = XShell.execCommand(
-            "monkey -p $pkg -c android.intent.category.LAUNCHER 1",
-            true,
-            true
+        val result = ShellExecutor.execWithResult(
+            "monkey -p $pkg -c android.intent.category.LAUNCHER 1"
         )
-
-        if (result.result == 0) {
+        if (result != null) {
             Log.i(TAG, "Launched $pkg successfully.")
         } else {
-            Log.w(TAG, "Launch failed for $pkg [${result.result}]: ${result.errorMsg?.trim()}")
+            Log.w(TAG, "Launch failed for $pkg")
         }
     }
 
@@ -95,12 +92,10 @@ class AppGuardWorker(
      */
     private fun isProcessAlive(pkg: String): Boolean {
         // 优先用 pidof（更快）
-        val pidofResult = XShell.execCommand("pidof $pkg", true, true)
-        if (pidofResult.result == 0 && !pidofResult.successMsg.isNullOrBlank()) {
-            return true
-        }
+        val pidof = ShellExecutor.execWithResult("pidof $pkg")
+        if (!pidof.isNullOrBlank()) return true
         // 降级用 ps
-        val psResult = XShell.execCommand("ps -A | grep $pkg", true, true)
-        return psResult.result == 0 && !psResult.successMsg.isNullOrBlank()
+        val ps = ShellExecutor.execWithResult("ps -A | grep $pkg")
+        return !ps.isNullOrBlank()
     }
 }
