@@ -1,6 +1,7 @@
 package com.omnicontrol.agent.util
 
 import android.content.Context
+import android.os.Environment
 import android.util.Log
 import java.io.File
 import java.io.FileWriter
@@ -9,20 +10,35 @@ import java.util.Date
 import java.util.Locale
 
 /**
- * 文件日志工具：将日志同时输出到 logcat 和本地文件（files/omnicontrol.log）。
+ * 文件日志工具：将日志同时输出到 logcat 和本地文件。
+ * 优先写入 /sdcard/omnicontrol/omnicontrol.log，失败时回退到应用私有目录 files/omnicontrol.log。
  * 文件超过 5MB 时自动轮转。
  */
 object FileLogger {
 
     private const val MAX_FILE_SIZE = 5 * 1024 * 1024L  // 5 MB
     private const val LOG_FILE_NAME = "omnicontrol.log"
+    private const val PUBLIC_DIR_NAME = "omnicontrol"
     private val dateFormat = SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS", Locale.US)
 
     @Volatile
     private var logFile: File? = null
 
     fun init(context: Context) {
-        logFile = File(context.filesDir, LOG_FILE_NAME)
+        val publicDir = File(Environment.getExternalStorageDirectory(), PUBLIC_DIR_NAME)
+        val publicFile = File(publicDir, LOG_FILE_NAME)
+
+        logFile = try {
+            if (!publicDir.exists()) {
+                publicDir.mkdirs()
+            }
+            if (!publicFile.exists()) {
+                publicFile.createNewFile()
+            }
+            publicFile
+        } catch (_: Exception) {
+            File(context.filesDir, LOG_FILE_NAME)
+        }
     }
 
     fun i(tag: String, msg: String) {
