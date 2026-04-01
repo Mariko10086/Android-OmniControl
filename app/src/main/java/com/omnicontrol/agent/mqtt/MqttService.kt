@@ -25,8 +25,10 @@ import com.omnicontrol.agent.update.UpdateInstaller
 import com.omnicontrol.agent.util.FileLogger
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 
 /**
@@ -35,6 +37,8 @@ import kotlinx.coroutines.launch
  * Lifecycle:
  * - Started by [OmniControlApp.onCreate] and [BootReceiver].
  * - [START_STICKY] ensures the system restarts it if killed under memory pressure.
+ *   重要：START_STICKY 重启时系统只调 onStartCommand，不调 onCreate，
+ *   因此所有需要重新初始化的状态必须在 onStartCommand 中重置，而非依赖成员变量初始值。
  * - Stopped only when the app is explicitly uninstalled or the service is disabled.
  */
 class MqttService : Service() {
@@ -54,21 +58,32 @@ class MqttService : Service() {
         }
     }
 
-    private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    /**
+     * serviceScope 每次 onCreate 新建，onDestroy 取消。
+     * START_STICKY 重启时系统重新走 onCreate → 新的 scope，避免旧 cancelled scope 上 launch 失败。
+     */
+    private lateinit var serviceScope: CoroutineScope
     private lateinit var mqttManager: MqttManager
     private lateinit var updateInstaller: UpdateInstaller
 
-    /** 防止 onStartCommand 多次调用时重复启动 initializeConnection 协程 */
+    /**
+     * 防止同一次 Service 生命周期内 onStartCommand 被多次调用时重复初始化连接。
+     * 每次 onCreate 重置为 false，使 START_STICKY 重启后能正确重新连接。
+     */
     @Volatile
     private var connectionInitialized = false
 
     /** 监听 connectionState 的协程 Job，确保只有一个存活 */
-    private var connectionStateJob: kotlinx.coroutines.Job? = null
+    private var connectionStateJob: Job? = null
 
     override fun onCreate() {
         super.onCreate()
+        // 每次 Service 实例创建时重建 scope 和状态，保证 START_STICKY 重启后干净初始化
+        serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+        connectionInitialized = false
         createNotificationChannel()
         updateInstaller = UpdateInstaller(applicationContext)
+        FileLogger.i(TAG, "MqttService onCreate")
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -77,10 +92,17 @@ class MqttService : Service() {
         } else {
             startForeground(NOTIF_ID, buildNotification())
         }
+
+        if (!serviceScope.isActive) {
+            // 极端情况：scope 已经被 cancel（理论上不应到这里，防御性处理）
+            FileLogger.w(TAG, "serviceScope is cancelled, rebuilding...")
+            serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+            connectionInitialized = false
+        }
+
         serviceScope.launch {
             if (connectionInitialized) return@launch
             connectionInitialized = true
-            if (::mqttManager.isInitialized && mqttManager.isConnected()) return@launch
             initializeConnection()
         }
         return START_STICKY
@@ -206,7 +228,9 @@ class MqttService : Service() {
     }
 
     override fun onDestroy() {
+        FileLogger.i(TAG, "MqttService onDestroy")
         serviceScope.cancel()
+        connectionStateJob = null
         if (::mqttManager.isInitialized) {
             mqttManager.disconnect()
         }
