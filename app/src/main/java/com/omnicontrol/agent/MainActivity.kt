@@ -85,6 +85,11 @@ class MainActivity : AppCompatActivity() {
                 binding.textAndroidVersion.text =
                     "Android: ${d.androidVersion} (API ${d.sdkVersion})"
                 binding.textBrand.text = "Language: ${d.systemLanguage}"
+
+                binding.textFileWriteTmp.text =
+                    "/data/local/tmp  ${if (d.fileWriteCheckTmp) "✓ 可写" else "✗ 不可写"}"
+                binding.textFileWriteSdcard.text =
+                    "/sdcard/mock     ${if (d.fileWriteCheckSdcard) "✓ 可写" else "✗ 不可写"}"
             }
 
             state.storageInfo?.let { s ->

@@ -35,5 +35,13 @@ data class DeviceInfo(
     val systemLanguage: String = "",
 
     @SerializedName("file_write_check")
-    val fileWriteCheck: Boolean = false
+    val fileWriteCheck: Boolean = false,
+
+    /** /data/local/tmp 写入测试结果（仅本地 UI 使用，不上报 MQTT） */
+    @Transient
+    val fileWriteCheckTmp: Boolean = false,
+
+    /** /sdcard/mock/ 写入测试结果（仅本地 UI 使用，不上报 MQTT） */
+    @Transient
+    val fileWriteCheckSdcard: Boolean = false
 )

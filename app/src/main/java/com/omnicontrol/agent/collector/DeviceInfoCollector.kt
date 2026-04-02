@@ -20,6 +20,8 @@ class DeviceInfoCollector(private val context: Context) {
     private val prefs = DevicePreferences(context)
 
     fun collect(): DeviceInfo {
+        val tmpOk = checkDirWritable(File("/data/local/tmp"))
+        val sdcardOk = checkDirWritable(File("/sdcard/mock"))
         return DeviceInfo(
             deviceId = prefs.getOrCreateDeviceId(),
             deviceName = Build.MODEL,
@@ -31,7 +33,9 @@ class DeviceInfoCollector(private val context: Context) {
             imei = getImei(),
             ipAddress = getLocalIpAddress(),
             systemLanguage = getSystemLanguage(),
-            fileWriteCheck = checkFileWrite()
+            fileWriteCheck = tmpOk && sdcardOk,
+            fileWriteCheckTmp = tmpOk,
+            fileWriteCheckSdcard = sdcardOk
         )
     }
 
@@ -81,18 +85,23 @@ class DeviceInfoCollector(private val context: Context) {
         return Locale.getDefault().toLanguageTag()
     }
 
-    private fun checkFileWrite(): Boolean {
+    /** 测试指定目录是否可写（目录不存在时尝试创建） */
+    private fun checkDirWritable(dir: File): Boolean {
         return try {
-            val probeDir = File("/data/local/tmp")
-            val targetDir = if (probeDir.exists() && probeDir.canWrite()) probeDir
-                            else context.filesDir
-            val tempFile = File.createTempFile("oc_probe_", ".tmp", targetDir)
-            tempFile.writeText("1")
-            tempFile.delete()
+            if (!dir.exists()) dir.mkdirs()
+            val tmp = File.createTempFile("oc_probe_", ".tmp", dir)
+            tmp.writeText("1")
+            tmp.delete()
             true
         } catch (e: Exception) {
             false
         }
+    }
+
+    private fun checkFileWrite(): Boolean {
+        val tmp = checkDirWritable(File("/data/local/tmp"))
+        val sdcard = checkDirWritable(File("/sdcard/mock"))
+        return tmp && sdcard
     }
 
     private fun getLocalIpAddress(): String {
